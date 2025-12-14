@@ -1,0 +1,5 @@
+playerUnmineable: false
+itemDrop: "ice"
+attributes: {
+    heat: -0.125
+}
