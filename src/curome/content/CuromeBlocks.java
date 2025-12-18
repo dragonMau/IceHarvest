@@ -1,5 +1,7 @@
 package curome.content;
 
+import curome.world.type.CuromeThermalRecipe;
+import mindustry.content.Blocks;
 import mindustry.content.Items;
 import mindustry.content.Liquids;
 import mindustry.type.Category;
@@ -11,7 +13,7 @@ import mindustry.world.draw.DrawRegion;
 import mindustry.world.draw.DrawLiquidTile;
 import mindustry.world.draw.DrawMulti;
 import curome.world.blocks.CuromeIcebox;
-import curome.content.CuromeItems;
+//import curome.content.CuromeItems;
 import curome.Logging;
 import arc.struct.Seq;
 
@@ -25,7 +27,6 @@ public class CuromeBlocks {
     public static final Seq<Block> all = new Seq<>();
     
     public static void load(){
-        
         icebox = new CuromeIcebox("icebox"){{
             requirements(Category.crafting, with(
                 Items.titanium, 40,
@@ -33,26 +34,25 @@ public class CuromeBlocks {
                 Items.metaglass, 15,
                 Items.silicon, 15
             ));
-            
-            consumeItem(CuromeItems.ice);
-            consumeLiquid(Liquids.water, 30f/120f);
-            
-            craftTime = 120;
-            outputItem = new ItemStack(CuromeItems.ice, 1);
-            outputLiquid = new LiquidStack(Liquids.water, 30f / 120f);
-            
-            baseEfficiency = 0f;
-            minEfficiency = -8f;
-            maxBoost = 8f;
-            scaleLiquidConsumption = true;
+            addRecipe(
+                new CuromeThermalRecipe(){{
+                    temperature = 0f;
+                    latent = 334000f;
+                    solid = new ItemStack(CuromeItems.ice, 1);
+                    heatCapacitySolid = 2090f;
+                    liquid = new LiquidStack(Liquids.water, 30);
+                    heatCapacityLiquid = 139.5f;
+                }}
+            );
             
             size = 2;
             itemCapacity = 30;
             liquidCapacity = 450f;
             
-            drawer = new DrawMulti(new DrawRegion("-bottom"), new DrawLiquidTile(Liquids.water), new DrawLiquidTile(Liquids.cryofluid){{drawLiquidLight = true;}}, new DrawDefault());
+            drawer = new DrawMulti(new DrawRegion("-bottom"), new DrawLiquidTile(Liquids.water), new DrawDefault());
         }};
-        
+
+        all.addAll(icebox);
         Logging.info("Loaded "+all.size+" blocks.");
     }
 }

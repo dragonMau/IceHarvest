@@ -14,7 +14,7 @@ public class CuromeItems {
         ice = new Item("ice", Color.valueOf("a29fff")){{
             lowPriority = true;
             buildable = false;
-            hardness = 4;
+            hardness = 3;
         }};
         
         all.addAll(ice);

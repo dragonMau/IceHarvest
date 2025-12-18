@@ -1,5 +1,6 @@
 package curome;
 
+import arc.util.Log;
 import curome.Logging;
 import curome.content.CuromeBlocks;
 import curome.content.CuromeItems;
@@ -12,6 +13,7 @@ public class IceHarvest extends Mod{
 
     @Override
     public void loadContent(){
+        Log.level = Log.LogLevel.debug;
         Logging.info("Loading content.");
         CuromeItems.load();
         CuromeBlocks.load();

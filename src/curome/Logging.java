@@ -7,4 +7,7 @@ public class Logging {
     public static void info(String msg) {
         Log.info(prefix+" "+msg);
     }
+    public static void debug(String msg) {
+        Log.debug(prefix+" "+msg);
+    }
 }
