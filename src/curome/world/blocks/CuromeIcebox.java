@@ -260,6 +260,10 @@ public class CuromeIcebox extends GenericCrafter {
 
         @Override
         public void updateTile() {
+            /* TODO:
+             *  add energy with items/liquids, recipe.temperature
+             *  add day light and weather effect on energy
+            */
             updateHeatCapacity();
             updateTemperature();
             updateCraft();
