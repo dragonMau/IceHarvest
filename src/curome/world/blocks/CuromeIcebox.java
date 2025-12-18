@@ -4,7 +4,6 @@ import arc.Core;
 import arc.struct.ObjectMap;
 import arc.util.io.Reads;
 import arc.util.io.Writes;
-import curome.Logging;
 import curome.world.type.CuromeThermalRecipe;
 import mindustry.content.Liquids;
 import mindustry.logic.LAccess;
@@ -33,7 +32,7 @@ public class CuromeIcebox extends GenericCrafter {
     public ObjectMap<Item, Float> heatCapacityItems = new ObjectMap<>();
     public ObjectMap<Liquid, Float> heatCapacityLiquids = new ObjectMap<>();
 
-    public float conductivity = 4000f;
+    public float conductivity = 100f;
     public final float ambientTemperature = 25f;
     public final float ambientHeatTransition = 200f;
     public final float[] temperatureLimits = new float[]{-273.15f, 1.416784e32f};
@@ -69,9 +68,9 @@ public class CuromeIcebox extends GenericCrafter {
         }
         // new bar for heat
         addBar("heat", (CuromeIceboxBuild entity) -> new Bar(
-            () -> Core.bundle.format("bar.temperature", Mathf.round(entity.energy/entity.heatCapacity)),
+            () -> Core.bundle.format("bar.temperature", Mathf.round(entity.temperature)),
             () -> entity.latentEnergy < 0 ? Liquids.cryofluid.color : Liquids.slag.color,
-                entity::progress
+                entity::progress_bar
         ));
 
         for(var stack : outputLiquids){
@@ -193,8 +192,8 @@ public class CuromeIcebox extends GenericCrafter {
         public void updateTemperature() {
             // if this has solid, cant be > minimal recipe temperature
             // if this has liquid, cant be < maximal recipe temperature
-            float minTemp = temperatureLimits[1];
-            float maxTemp = temperatureLimits[0];
+            float minTemp = temperatureLimits[0];
+            float maxTemp = temperatureLimits[1];
             for(var recipe : recipes) {
                 // if this has ice
                 if (items.get(recipe.solid.item) >= recipe.solid.amount) {
@@ -217,6 +216,12 @@ public class CuromeIcebox extends GenericCrafter {
                 latentEnergy = (temperature - minTemp) * heatCapacity;
                 temperature = minTemp;
             }
+            float tmpAbsLatent = Math.abs(latentEnergy);
+            if (tmpAbsLatent > recipeLatent) {
+                float deltaCorrection = Mathf.sign(latentEnergy) * (tmpAbsLatent - recipeLatent);
+                latentEnergy -= deltaCorrection;
+                energy -= deltaCorrection;
+            }
         }
         public void updateCraft() {
             for(var recipe : recipes) {
@@ -224,12 +229,13 @@ public class CuromeIcebox extends GenericCrafter {
                     recipeLatent = recipe.latent;// update for visual
                     if (
                             latentEnergy >= recipe.latent &&
-                                    items.get(recipe.solid.item) >= recipe.solid.amount &&
-                                    liquids.get(recipe.liquid.liquid) + recipe.liquid.amount <= liquidCapacity
+                            items.get(recipe.solid.item) >= recipe.solid.amount &&
+                            liquids.get(recipe.liquid.liquid) + recipe.liquid.amount <= liquidCapacity
                     ) {
                         items.remove(recipe.solid);
                         liquids.add(recipe.liquid.liquid, recipe.liquid.amount);
                         latentEnergy -= recipe.latent;
+                        energy -= recipe.latent;
                     } else if (
                             latentEnergy <= -recipe.latent &&
                                     liquids.get(recipe.liquid.liquid) >= recipe.liquid.amount &&
@@ -237,13 +243,14 @@ public class CuromeIcebox extends GenericCrafter {
                     ) {
                         liquids.remove(recipe.liquid.liquid, recipe.liquid.amount);
                         items.add(recipe.solid.item, recipe.solid.amount);
-                        latentEnergy -= -recipe.latent;
+                        latentEnergy += recipe.latent;
+                        energy += recipe.latent;
                     }
                 }
             }
         }
         public void updateHeatExchange() {
-            float deltaEnergy = edelta() * conductivity * (envTemperature - temperature);
+            float deltaEnergy = delta() * conductivity * (envTemperature - temperature);
             energy += deltaEnergy;
         }
         public float dayRadiation() {
@@ -260,8 +267,7 @@ public class CuromeIcebox extends GenericCrafter {
             dumpOutputs();
         }
 
-        @Override
-        public float progress() {
+        public float progress_bar() {
             float progress;
             if (recipeLatent > 0)
                 progress = Math.abs(latentEnergy) / recipeLatent;
@@ -271,8 +277,14 @@ public class CuromeIcebox extends GenericCrafter {
         }
 
         @Override
+        public float progress() {
+            return latentEnergy;
+        }
+
+        @Override
         public double sense(LAccess sensor){
             return switch (sensor) {
+                // those are debug fields i will remove them.
                 case heat -> temperature;
                 case efficiency -> envTemperature;
                 case powerCapacity -> heatCapacity;

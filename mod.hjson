@@ -3,6 +3,6 @@ name: "ice-mod"
 author: "Curome"
 main: "curome.IceHarvest"
 description: "Frozen water crystals harvested from icy terrain."
-version: 0.8.10
-minGameVersion: 150
+version: 0.10.1
+minGameVersion: 154
 java: true
