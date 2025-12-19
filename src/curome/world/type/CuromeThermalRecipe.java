@@ -8,6 +8,8 @@ public class CuromeThermalRecipe {
     public float latent;
     public ItemStack solid;
     public float heatCapacitySolid;
+    public float temperatureSolid;
     public LiquidStack liquid;
     public float heatCapacityLiquid;
+    public float temperatureLiquid;
 }

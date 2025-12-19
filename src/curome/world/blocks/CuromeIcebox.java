@@ -6,6 +6,8 @@ import arc.util.io.Reads;
 import arc.util.io.Writes;
 import curome.world.type.CuromeThermalRecipe;
 import mindustry.content.Liquids;
+import mindustry.entities.Effect;
+import mindustry.entities.Puddles;
 import mindustry.logic.LAccess;
 import mindustry.type.ItemStack;
 import mindustry.type.Item;
@@ -13,13 +15,14 @@ import mindustry.type.Liquid;
 import mindustry.type.LiquidStack;
 import mindustry.world.Tile;
 import mindustry.ui.Bar;
-
 import mindustry.world.blocks.production.GenericCrafter;
 import mindustry.world.meta.Attribute;
+import mindustry.content.Fx;
 
 import arc.struct.Seq;
 import arc.math.Mathf;
-
+import mindustry.world.modules.ItemModule;
+import mindustry.world.modules.LiquidModule;
 
 import static mindustry.Vars.*;
 
@@ -31,7 +34,10 @@ public class CuromeIcebox extends GenericCrafter {
     public float heatCapacityBase = 50000f;
     public ObjectMap<Item, Float> heatCapacityItems = new ObjectMap<>();
     public ObjectMap<Liquid, Float> heatCapacityLiquids = new ObjectMap<>();
+    public ObjectMap<Item, Float> temperatureItems = new ObjectMap<>();
+    public ObjectMap<Liquid, Float> temperatureLiquids = new ObjectMap<>();
 
+    public Effect overpressureEffect = Fx.shockwave;
     public float conductivity = 100f;
     public final float ambientTemperature = 25f;
     public final float ambientHeatTransition = 200f;
@@ -48,8 +54,10 @@ public class CuromeIcebox extends GenericCrafter {
         consumeItem(recipe.solid.item, 1);
         outputItemsBuilder.add(recipe.solid);
         heatCapacityItems.put(recipe.solid.item, recipe.heatCapacitySolid);
+        temperatureItems.put(recipe.solid.item, recipe.temperatureSolid);
         outputLiquidsBuilder.add(recipe.liquid);
         heatCapacityLiquids.put(recipe.liquid.liquid, recipe.heatCapacityLiquid);
+        temperatureLiquids.put(recipe.liquid.liquid, recipe.temperatureLiquid);
     }
 
     @Override
@@ -179,14 +187,30 @@ public class CuromeIcebox extends GenericCrafter {
         public float temperature = 0f;
         public float latentEnergy = 0f;
         public float recipeLatent = 0f;
+        public ItemModule itemsOld = new ItemModule();
+        public LiquidModule liquidsOld = new LiquidModule();
 
-        public void updateHeatCapacity() {
-            heatCapacity = heatCapacityBase;
-            for(var hCap : heatCapacityItems) {
-                heatCapacity += items.get(hCap.key) * hCap.value;
+        public void updateContentsChange() {
+            float tmpHCap;
+            for(var item : temperatureItems){
+//                Logging.debug("item: " + item.key.name + ": " +itemsOld.get(item.key) +"/"+items.get(item.key));
+                var itemDelta = items.get(item.key) - itemsOld.get(item.key);
+                tmpHCap = heatCapacityItems.get(item.key) * itemDelta;
+                itemsOld.add(item.key, itemDelta);
+                energy += item.value * tmpHCap;
+                heatCapacity += tmpHCap;
+//                Logging.debug("tmpHCap: "+tmpHCap);
+//                Logging.debug("item after: " + item.key.name + ": " +itemsOld.get(item.key) +"/"+items.get(item.key));
             }
-            for(var hCap : heatCapacityLiquids) {
-                heatCapacity += liquids.get(hCap.key) * hCap.value;
+            for(var liquid : temperatureLiquids){
+//                Logging.debug("liquid: "+liquid.key.name+": "+liquidsOld.get(liquid.key) +"/"+liquids.get(liquid.key));
+                var liquidDelta = liquids.get(liquid.key) - liquidsOld.get(liquid.key);
+                tmpHCap = heatCapacityLiquids.get(liquid.key) * liquidDelta;
+                liquidsOld.add(liquid.key, liquidDelta);
+                energy += liquid.value * tmpHCap;
+                heatCapacity += tmpHCap;
+//                Logging.debug("tmpHCap: "+tmpHCap);
+//                Logging.debug("liquid after: "+liquid.key.name+": "+liquidsOld.get(liquid.key) +"/"+liquids.get(liquid.key));
             }
         }
         public void updateTemperature() {
@@ -229,20 +253,29 @@ public class CuromeIcebox extends GenericCrafter {
                     recipeLatent = recipe.latent;// update for visual
                     if (
                             latentEnergy >= recipe.latent &&
-                            items.get(recipe.solid.item) >= recipe.solid.amount &&
-                            liquids.get(recipe.liquid.liquid) + recipe.liquid.amount <= liquidCapacity
+                            items.get(recipe.solid.item) >= recipe.solid.amount
                     ) {
                         items.remove(recipe.solid);
-                        liquids.add(recipe.liquid.liquid, recipe.liquid.amount);
+                        if (liquids.get(recipe.liquid.liquid) + recipe.liquid.amount <= liquidCapacity)
+                            liquids.add(recipe.liquid.liquid, recipe.liquid.amount);
+                        else {
+                            tile.getLinkedTilesAs(block, tempTiles).forEach(other -> {
+                                Puddles.deposit(other, this.tile, recipe.liquid.liquid, recipe.liquid.amount/(block.size*block.size), true, true);
+                            });
+                        }
                         latentEnergy -= recipe.latent;
                         energy -= recipe.latent;
                     } else if (
                             latentEnergy <= -recipe.latent &&
-                                    liquids.get(recipe.liquid.liquid) >= recipe.liquid.amount &&
-                                    items.total() + recipe.solid.amount <= itemCapacity
+                            liquids.get(recipe.liquid.liquid) >= recipe.liquid.amount
                     ) {
                         liquids.remove(recipe.liquid.liquid, recipe.liquid.amount);
-                        items.add(recipe.solid.item, recipe.solid.amount);
+                        if (items.total() + recipe.solid.amount <= itemCapacity)
+                            items.add(recipe.solid.item, recipe.solid.amount);
+                        else {
+                            damage(maxHealth * recipe.solid.amount/itemCapacity);
+                            overpressureEffect.at(x, y);
+                        }
                         latentEnergy += recipe.latent;
                         energy += recipe.latent;
                     }
@@ -264,7 +297,8 @@ public class CuromeIcebox extends GenericCrafter {
              *  add energy with items/liquids, recipe.temperature
              *  add day light and weather effect on energy
             */
-            updateHeatCapacity();
+//            Logging.debug("tick ----");
+            updateContentsChange();
             updateTemperature();
             updateCraft();
             updateHeatExchange();
@@ -309,11 +343,13 @@ public class CuromeIcebox extends GenericCrafter {
         @Override
         public void write(Writes write){
             write.f(energy);
+            write.f(heatCapacity);
         }
 
         @Override
         public void read(Reads read, byte revision){
             energy = read.f();
+            heatCapacity = read.f();
         }
     }
 }

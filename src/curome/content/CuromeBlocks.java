@@ -40,8 +40,10 @@ public class CuromeBlocks {
                     latent = 334000f;
                     solid = new ItemStack(CuromeItems.ice, 1);
                     heatCapacitySolid = 2090f;
+                    temperatureSolid = -10f;
                     liquid = new LiquidStack(Liquids.water, 30);
                     heatCapacityLiquid = 139.5f;
+                    temperatureLiquid = 25f;
                 }}
             );
             
